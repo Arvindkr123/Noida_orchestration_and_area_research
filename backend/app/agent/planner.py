@@ -1,0 +1,96 @@
+
+from functools import lru_cache
+
+from langchain_groq import ChatGroq
+
+from app.config import get_settings
+
+from app.schemas.research import (
+    ResearchIntent,
+    ResearchPlan
+)
+
+
+# Reuse one client across requests instead of rebuilding it for every graph run.
+@lru_cache
+def get_llm():
+
+    settings = get_settings()
+
+    return ChatGroq(
+        model=settings.GROQ_MODEL,
+        api_key=settings.GROQ_API_KEY,
+        temperature=0
+    )
+
+
+async def parse_user_intent(request: dict) -> ResearchIntent:
+
+    llm = get_llm()
+
+    # Validate the model's response against our schema before storing it in state.
+    structured_llm = llm.with_structured_output(
+        ResearchIntent
+    )
+
+    prompt = f"""
+    You are an expert location research assistant.
+
+    Research location: Noida, India.
+
+    User selected mode: {request["mode"]}
+    User input: {request["input"]}
+
+    Extract:
+    - City
+    - Sector, if explicitly provided
+    - Research topics
+    - Whether current information is needed
+    - User constraints
+    - Original request
+
+    Never invent a sector or location.
+    Return data matching the requested schema.
+    """
+
+    result = await structured_llm.ainvoke(prompt)
+
+    return result
+
+
+async def create_research_plan(
+    intent: ResearchIntent
+) -> ResearchPlan:
+
+    llm = get_llm()
+
+    # This stage proposes questions and tools; it does not execute the tools.
+    structured_llm = llm.with_structured_output(
+        ResearchPlan
+    )
+
+    prompt = f"""
+    You are a senior research planning agent.
+
+    User intent:
+    {intent.model_dump_json(indent=2)}
+
+    Available tools:
+
+    news_search: Recent news and announcements.
+    weather: Current weather and forecast.
+    traffic: Traffic and connectivity information.
+
+    Create 3 to 6 useful research questions.
+
+    Select relevant tools.
+    Include all three for broad area research.
+
+    Do not claim tools have been executed.
+
+    Return the result using the requested schema.
+    """
+
+    result = await structured_llm.ainvoke(prompt)
+
+    return result

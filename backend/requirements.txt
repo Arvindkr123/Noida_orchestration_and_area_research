@@ -1,0 +1,11 @@
+
+fastapi
+uvicorn[standard]
+langgraph
+langchain-groq
+langchain-core
+pydantic
+pydantic-settings
+python-dotenv
+tavily-python
+httpx
