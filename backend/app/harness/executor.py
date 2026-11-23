@@ -21,6 +21,7 @@ async def _execute_one(
     intent: ResearchIntent,
     plan: ResearchPlan,
 ) -> ToolExecutionResult:
+    # Isolate each tool's error so one provider failure does not cancel the others.
     log_tool_event(run_id, tool_name, "started")
     try:
         data = await TOOL_REGISTRY[tool_name](intent, plan)
@@ -50,12 +51,14 @@ async def execute_selected_tools(
 ) -> dict[str, Any]:
     """Run each planned tool once and retain individual failures in the output."""
     run_id = state["run_id"]
+    # gather runs the selected async tools concurrently and preserves their order.
     results = await asyncio.gather(
         *(
             _execute_one(run_id, tool_name, intent, plan)
             for tool_name in plan.selected_tools
         )
     )
+    # Convert Pydantic results to dictionaries before storing them in graph state.
     serialized = [result.model_dump() for result in results]
     errors = [
         f"{result.tool}: {result.error}"

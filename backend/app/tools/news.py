@@ -9,10 +9,12 @@ async def search_news(
     _plan: ResearchPlan,
 ) -> dict[str, Any]:
     """Find recent news relevant to the requested Noida location and topic."""
+    # Prefer the explicitly extracted sector; otherwise search across the city.
     location = intent.sector or intent.city
     topics = ", ".join(intent.topic)
     query = f"Recent news and announcements about {location}, Noida"
     if topics:
         query = f"{query}: {topics}"
 
+    # Tavily's news topic narrows the search to recent news and announcements.
     return await tavily_search(query, topic="news")

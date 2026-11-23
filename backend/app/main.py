@@ -18,6 +18,7 @@ logging.basicConfig(
 # Load settings once so the app metadata and configuration share the same values.
 settings = get_settings()
 
+# FastAPI uses this object to serve the API routes and generated /docs page.
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -26,7 +27,7 @@ app = FastAPI(
     )
 )
 
-# The frontend dev server uses this origin; keep local browser requests explicit.
+# CORS lets the browser-based frontend call this API from its dev-server origin.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -35,6 +36,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# Add the research endpoints defined in app/api/research.py to this application.
 app.include_router(router)
 
 

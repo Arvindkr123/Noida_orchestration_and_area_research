@@ -20,6 +20,7 @@ router = APIRouter(
 
 @router.post("/research")
 async def create_research(request: ResearchRequest):
+    """Run the research graph and return its final state as an API response."""
 
     # Reuse this ID in logs and the response so a run is easy to trace.
     run_id = str(uuid4())
@@ -30,6 +31,8 @@ async def create_research(request: ResearchRequest):
         request.mode
     )
 
+    # LangGraph passes this shared state through each node; later nodes fill
+    # intent, plan, results, and trace entries.
     initial_state = {
         "run_id": run_id,
         # The graph fills in intent and plan as its nodes run.
@@ -42,7 +45,7 @@ async def create_research(request: ResearchRequest):
     }
 
     try:
-
+        # ainvoke waits for the graph to finish all its connected nodes.
         result = await research_graph.ainvoke(
             initial_state
         )
@@ -68,7 +71,8 @@ async def create_research(request: ResearchRequest):
 
     except Exception as error:
 
-        # Don't return a success-shaped response when planning fails.
+        # A graph-level failure (for example, an invalid LLM plan) aborts the
+        # run, so return an HTTP error instead of a partial-success response.
         logger.exception(
             "run_id=%s research_failed",
             run_id

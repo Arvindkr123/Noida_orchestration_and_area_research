@@ -6,6 +6,8 @@ from app.schemas.research import ResearchPlan, ToolName
 
 
 class ToolExecutionResult(BaseModel):
+    """One tool's outcome, with data for success or an error for failure."""
+
     tool: ToolName
     status: Literal["success", "error"]
     data: dict[str, Any] | None = None
@@ -26,6 +28,7 @@ class ToolExecutionResult(BaseModel):
 
 def validate_research_plan(plan: ResearchPlan | dict[str, Any]) -> ResearchPlan:
     """Validate both the plan's shape and the constraints in the planning prompt."""
+    # Pydantic checks field types and allowed tool names before these extra rules.
     validated = ResearchPlan.model_validate(plan)
     questions = [question.strip() for question in validated.research_questions]
 
@@ -47,4 +50,5 @@ def validate_tool_result(
     tool: ToolName,
     data: dict[str, Any],
 ) -> ToolExecutionResult:
+    # Wrap raw provider data in the shared result format used by the executor.
     return ToolExecutionResult(tool=tool, status="success", data=data)

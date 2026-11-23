@@ -17,6 +17,7 @@ from app.agent.planner import (
 logger = logging.getLogger(__name__)
 
 
+# A node receives the current state and returns only the fields it updates.
 async def intent_parser_node(state: ResearchState):
 
     run_id = state["run_id"]
@@ -48,7 +49,8 @@ async def research_planner_node(state: ResearchState):
         run_id
     )
 
-    # Rebuild the model so planning receives validated intent, not an untyped dict.
+    # The graph stores plain dictionaries; rebuild the Pydantic model so this
+    # node receives validated, typed intent data.
     intent = ResearchIntent(**state["intent"])
 
     plan = validate_research_plan(await create_research_plan(intent))
@@ -65,6 +67,7 @@ async def research_planner_node(state: ResearchState):
 
 
 async def tool_executor_node(state: ResearchState):
+    # Convert graph dictionaries back to typed models before calling the tools.
     intent = ResearchIntent(**state["intent"])
     plan = ResearchPlan(**state["plan"])
     return await execute_selected_tools(state, intent, plan)
@@ -72,6 +75,7 @@ async def tool_executor_node(state: ResearchState):
 
 def build_research_graph():
 
+    # StateGraph connects our Python functions into a stateful workflow.
     workflow = StateGraph(ResearchState)
 
     workflow.add_node(
@@ -88,7 +92,7 @@ def build_research_graph():
         tool_executor_node
     )
 
-    # Keep the flow explicit: parse intent first, then build a plan from it.
+    # These edges determine the order in which the three nodes run.
     workflow.add_edge(
         START,
         "intent_parser"
@@ -109,6 +113,7 @@ def build_research_graph():
         END
     )
 
+    # Compile once at startup; each request invokes this reusable graph.
     return workflow.compile()
 
 

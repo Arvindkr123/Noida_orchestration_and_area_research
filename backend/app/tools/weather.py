@@ -14,6 +14,7 @@ async def get_weather(
     _plan: ResearchPlan,
 ) -> dict[str, Any]:
     """Fetch current conditions and a short forecast for Noida."""
+    # The forecast API needs coordinates, so first resolve the city name.
     async with httpx.AsyncClient(timeout=20) as client:
         geocoding_response = await client.get(
             GEOCODING_URL,
@@ -30,6 +31,7 @@ async def get_weather(
             raise ValueError("Weather provider returned invalid geocoding data")
         locations = geocoding_payload.get("results")
 
+        # Stop here with a clear error if geocoding cannot provide coordinates.
         if not isinstance(locations, list) or not locations:
             raise ValueError(f"Could not find weather coordinates for {intent.city}")
 
@@ -44,6 +46,7 @@ async def get_weather(
         ):
             raise ValueError("Weather provider returned invalid coordinates")
 
+        # Use the resolved coordinates to request current and three-day data.
         forecast_response = await client.get(
             FORECAST_URL,
             params={
@@ -64,6 +67,7 @@ async def get_weather(
         forecast_response.raise_for_status()
         forecast = forecast_response.json()
 
+    # Check provider response shapes before building the API's result object.
     if not isinstance(forecast, dict):
         raise ValueError("Weather provider returned invalid forecast data")
 

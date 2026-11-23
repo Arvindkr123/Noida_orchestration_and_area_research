@@ -12,6 +12,7 @@ async def tavily_search(query: str, *, topic: str) -> dict[str, Any]:
     """Run one Tavily search and return a small, consistent result payload."""
     settings = get_settings()
 
+    # AsyncClient reuses the connection for this request and enforces a timeout.
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
             TAVILY_SEARCH_URL,
@@ -24,9 +25,11 @@ async def tavily_search(query: str, *, topic: str) -> dict[str, Any]:
                 "include_answer": True,
             },
         )
+        # Raise on HTTP errors before trying to interpret the response body.
         response.raise_for_status()
         payload = response.json()
 
+    # Normalize the provider response and fail clearly if its result list is absent.
     if not isinstance(payload, dict) or not isinstance(
         payload.get("results"), list
     ):

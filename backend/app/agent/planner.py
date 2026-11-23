@@ -58,6 +58,7 @@ async def parse_user_intent(request: dict) -> ResearchIntent:
     original_request (string).
     """
 
+    # ainvoke is the async LangChain call; the parser returns a ResearchIntent.
     result = await structured_llm.ainvoke(prompt)
 
     return result
@@ -100,9 +101,12 @@ async def create_research_plan(
     {json.dumps(ResearchPlan.model_json_schema(), indent=2)}
     """
 
+    # JSON mode asks for JSON text; Pydantic then checks it against ResearchPlan.
     try:
         result = await structured_llm.ainvoke(prompt)
     except OutputParserException:
+        # Retry only schema/JSON parsing failures; network and API errors still
+        # propagate so callers can report the real failure.
         retry_prompt = f"""
         {prompt}
 

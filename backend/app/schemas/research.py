@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+# Only these tool identifiers can be returned by a research plan.
 ToolName = Literal[
     "news_search",
     "weather",
@@ -10,14 +11,17 @@ ToolName = Literal[
 ]
 
 
-# Keep unsupported modes out of the LLM workflow.
+# Only these request modes are accepted by the API.
 ResearchMode = Literal[
     "query",
     "sector",
     "city"
 ]
 
+
 class ResearchRequest(BaseModel):
+    """Validated request body accepted by POST /api/research."""
+
     mode: ResearchMode
     input: str = Field(
         ...,
@@ -59,6 +63,7 @@ class ResearchRequest(BaseModel):
     
 
 class ResearchIntent(BaseModel):
+    """Normalized location and topics extracted from the user's request."""
 
     city: str = "Noida"
 
@@ -74,11 +79,13 @@ class ResearchIntent(BaseModel):
 
 
 class ResearchPlan(BaseModel):
+    """Questions and registered tools proposed for one research run."""
 
     location_scope: str
 
     research_questions: list[str]
 
+    # Restricting this field to ToolName prevents arbitrary tool dispatch.
     selected_tools: list[ToolName]
 
     reasoning: str
