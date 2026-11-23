@@ -1,6 +1,7 @@
-
+import json
 from functools import lru_cache
 
+from langchain_core.exceptions import OutputParserException
 from langchain_groq import ChatGroq
 
 from app.config import get_settings
@@ -30,7 +31,8 @@ async def parse_user_intent(request: dict) -> ResearchIntent:
 
     # Validate the model's response against our schema before storing it in state.
     structured_llm = llm.with_structured_output(
-        ResearchIntent
+        ResearchIntent,
+        method="json_mode"
     )
 
     prompt = f"""
@@ -50,7 +52,10 @@ async def parse_user_intent(request: dict) -> ResearchIntent:
     - Original request
 
     Never invent a sector or location.
-    Return data matching the requested schema.
+    Return only a JSON object with these exact keys:
+    city (string), sector (string or null), topic (array of strings),
+    time_sensitive (boolean), constraints (array of strings), and
+    original_request (string).
     """
 
     result = await structured_llm.ainvoke(prompt)
@@ -66,7 +71,8 @@ async def create_research_plan(
 
     # This stage proposes questions and tools; it does not execute the tools.
     structured_llm = llm.with_structured_output(
-        ResearchPlan
+        ResearchPlan,
+        method="json_mode"
     )
 
     prompt = f"""
@@ -88,9 +94,24 @@ async def create_research_plan(
 
     Do not claim tools have been executed.
 
-    Return the result using the requested schema.
+    Return one JSON object matching this schema. All four properties must be
+    at the top level. research_questions must contain only question strings;
+    do not put property names, punctuation, or tool lists in that array.
+    {json.dumps(ResearchPlan.model_json_schema(), indent=2)}
     """
 
-    result = await structured_llm.ainvoke(prompt)
+    try:
+        result = await structured_llm.ainvoke(prompt)
+    except OutputParserException:
+        retry_prompt = f"""
+        {prompt}
+
+        The previous response did not match the schema. Return a new JSON
+        object with location_scope, research_questions, selected_tools, and
+        reasoning as sibling properties. Include 3 to 6 string values in
+        research_questions. Keep selected_tools as a separate array containing
+        only valid tool names.
+        """
+        result = await structured_llm.ainvoke(retry_prompt)
 
     return result
